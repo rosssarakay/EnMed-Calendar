@@ -132,38 +132,6 @@ html,body{min-height:100vh;background:var(--bg);color:var(--black);font-family:'
 .faculty-mode .cal-cell:hover .add-slot-btn{display:flex}
 .add-slot-btn{display:none;position:absolute;inset:3px;border-radius:5px;border:2px dashed var(--gray-dk);background:rgba(247,201,79,.05);color:var(--gray-dk);font-size:18px;cursor:pointer;align-items:center;justify-content:center;z-index:5}
 .add-slot-btn:hover{background:rgba(247,201,79,.12)}
-
- /*<skross>*/
-.week-grid-fixed{
-  position:relative;
-  height:468px; /* 9 hours x 52px: 8am–5pm */
-}
-
-.week-hour-lines{
-  position:absolute;
-  inset:0;
-  display:grid;
-  grid-template-rows:repeat(9,52px);
-  pointer-events:none;
-}
-
-.week-hour-line{
-  border-bottom:1px solid var(--border);
-}
-
-.week-day-layer{
-  position:relative;
-  min-height:468px;
-  border-right:1px solid var(--border);
-}
-
-.week-event-fixed{
-  position:absolute;
-  left:4px;
-  right:4px;
-  overflow:hidden;
-}
-/*</skross>*/
   
 /* EVENTS */
 .event{border-radius:5px;padding:5px 7px;font-size:11px;font-weight:500;cursor:pointer;transition:transform .1s,box-shadow .15s;line-height:1.3;height:auto;min-height:44px;display:flex;flex-direction:column;justify-content:center;border-left:3px solid;position:relative;z-index:2;animation:fadeIn .2s ease}
@@ -1094,88 +1062,53 @@ function render(){
 function evClass(e){if(e.category==='Faculty Discussion')return'Faculty';if(e.category==='Exam Review')return'ExamReview';if(e.category==='Grand Rounds')return'GrandRounds';return e.category.replace(/\s/g,'');}
 
 function renderWeek(dates){
+  // If we somehow got to week view with -1 index, reset to 0
   if(currentWeekIdx<0)currentWeekIdx=0;
   const w=WEEKS[currentWeekIdx];
-
-  if(!w||!dates||!dates.length){
-    document.getElementById('calView').innerHTML='<div class="empty-state"><div class="big">📭</div><p>No week data available.</p></div>';
-    return;
-  }
-
+  if(!w||!dates||!dates.length){document.getElementById('calView').innerHTML='<div class="empty-state"><div class="big">📭</div><p>No week data available.</p></div>';return;}
   const evs=filteredEvents().filter(e=>e.weekNum===w.num);
   const today=new Date();
   const todayStr=`${String(today.getMonth()+1).padStart(2,'0')}/${String(today.getDate()).padStart(2,'0')}/${today.getFullYear()}`;
-
-  const START_MIN = timeToMinutes('08:00');
-  const PX_PER_MIN = 52 / 60;
-  const GRID_HEIGHT = 9 * 52;
-
-  let html=`<div class="cal-wrap">
-    <div class="cal-header"><div class="ch-cell"></div>`;
-
+  let html=`<div class="cal-wrap"><div class="cal-header"><div class="ch-cell"></div>`;
   DAYS.forEach((day,i)=>{
-    const ds=dates[i]||'';
-    const [,dy]=(ds||'//').split('/');
-    html+=`<div class="ch-cell${ds===todayStr?' today':''}">
-      <div class="ch-day">${day}</div>
-      <div class="ch-num">${dy?+dy:''}</div>
-    </div>`;
+    const ds=dates[i]||'';const[,dy]=(ds||'//').split('/');
+    html+=`<div class="ch-cell${ds===todayStr?' today':''}"><div class="ch-day">${day}</div><div class="ch-num">${dy?+dy:''}</div></div>`;
   });
-
-  html+=`</div>
-    <div style="display:grid;grid-template-columns:64px repeat(5,1fr);position:relative;">
-      <div style="position:relative;height:${GRID_HEIGHT}px;border-right:1px solid var(--border);">`;
-
+  html+='</div>';
   HOUR_KEYS.forEach((hk,hi)=>{
-    html+=`<div style="height:52px;padding:8px 6px;font-size:10px;color:var(--muted2);text-align:right;font-family:'DM Mono',monospace;border-bottom:1px solid var(--border);">${HOURS[hi]}</div>`;
-  });
-
-  html+=`</div>`;
-
-  dates.forEach(ds=>{
-    const dayEvs=evs.filter(e=>e.date===ds);
-    html+=`<div class="week-day-layer" onclick="handleCellClick(event,'${ds}','08:00')">
-      <div class="week-hour-lines">${HOUR_KEYS.map(()=>`<div class="week-hour-line"></div>`).join('')}</div>`;
-
-    if(isFacultyMode){
-      HOUR_KEYS.forEach(hk=>{
-        const top=(timeToMinutes(hk)-START_MIN)*PX_PER_MIN;
-        html+=`<div class="add-slot-btn" style="display:none;top:${top}px;height:52px;inset:auto 3px auto 3px;" onclick="openAddForm('${ds}','${hk}');event.stopPropagation()">+</div>`;
+    html+=`<div class="cal-row"><div class="cal-time">${HOURS[hi]}</div>`;
+    dates.forEach(ds=>{
+      const cellEvs=evs.filter(e=>e.date===ds&&e.start===hk);
+      html+=`<div class="cal-cell" onclick="handleCellClick(event,'${ds}','${hk}')">`;
+      if(isFacultyMode)html+=`<div class="add-slot-btn" onclick="openAddForm('${ds}','${hk}');event.stopPropagation()">+</div>`;
+      cellEvs.forEach(e=>{
+        const startMin = timeToMinutes(e.start);
+        const endMin = timeToMinutes(e.end);
+        const durHours = Math.max(1, (endMin - startMin) / 60);
+        const hp = durHours * 52 - 6;
+        const ec = evClass(e);
+        const ej=JSON.stringify(e).replace(/'/g,'&#39;').replace(/"/g,'&quot;');
+        const mcalCol=mCalColor(e);
+        const catCol=CAT_COLOR[e.category]||'#4a5168';
+        html+=`<div class="event ${ec}" style="min-height:${hp}px;background:${mcalCol}18;border-left:none;padding-left:12px;background-image:linear-gradient(to right,${catCol} 0px,${catCol} 4px,${mcalCol} 4px,${mcalCol} 8px,${mcalCol}18 8px);color:${mcalCol}" id="bev_${e._id}" onclick="bulkSelectMode?bulkToggleEvent('${e._id}'):handleEventClick(event,${ej})">
+          <div class="ev-tag" style="color:${catCol}">${e.category}</div>
+          <div class="ev-title">${displayTitle(e)}</div>
+          <div class="ev-time">${fmtTime(e.start)} – ${fmtTime(e.end)}</div>
+          ${isFacultyMode?`<div class="ev-controls">
+            <button class="ev-ctrl-btn ev-edit-btn" onclick="openEditForm(event,${ej})">✎</button>
+            <button class="ev-ctrl-btn ev-del-btn" onclick="confirmDelete(event,'${e._id}')">✕</button>
+          </div>`:''}
+        </div>`;
       });
-    }
-
-    dayEvs.forEach(e=>{
-      const startMin=timeToMinutes(e.start);
-      const endMin=timeToMinutes(e.end);
-      const top=Math.max(0,(startMin-START_MIN)*PX_PER_MIN);
-      const height=Math.max(44,(endMin-startMin)*PX_PER_MIN-6);
-      const ec=evClass(e);
-      const ej=JSON.stringify(e).replace(/'/g,'&#39;').replace(/"/g,'&quot;');
-      const mcalCol=mCalColor(e);
-      const catCol=CAT_COLOR[e.category]||'#4a5168';
-
-      html+=`<div class="event week-event-fixed ${ec}" style="top:${top+3}px;height:${height}px;min-height:${height}px;background:${mcalCol}18;border-left:none;padding-left:12px;background-image:linear-gradient(to right,${catCol} 0px,${catCol} 4px,${mcalCol} 4px,${mcalCol} 8px,${mcalCol}18 8px);color:${mcalCol}" id="bev_${e._id}" onclick="bulkSelectMode?bulkToggleEvent('${e._id}'):handleEventClick(event,${ej})">
-        <div class="ev-tag" style="color:${catCol}">${e.category}</div>
-        <div class="ev-title">${displayTitle(e)}</div>
-        <div class="ev-time">${fmtTime(e.start)} – ${fmtTime(e.end)}</div>
-        ${isFacultyMode?`<div class="ev-controls">
-          <button class="ev-ctrl-btn ev-edit-btn" onclick="openEditForm(event,${ej})">✎</button>
-          <button class="ev-ctrl-btn ev-del-btn" onclick="confirmDelete(event,'${e._id}')">✕</button>
-        </div>`:''}
-      </div>`;
+      html+='</div>';
     });
-
-    html+=`</div>`;
+    html+='</div>';
   });
-
-  html+=`</div></div>`;
-
-  if(!evs.length){
-    html=`<div class="empty-state"><div class="big">📭</div><p>No events match this filter.</p></div>`;
-  }
-
+  html+='</div>';
+  if(!evs.length)html=`<div class="empty-state"><div class="big">📭</div><p>No events match this filter.</p></div>`;
   document.getElementById('calView').innerHTML=html;
 }
+
 
 function renderList(){
   const w=currentWeekIdx>=0?WEEKS[currentWeekIdx]:null;
