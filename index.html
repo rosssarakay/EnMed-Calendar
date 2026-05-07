@@ -1062,7 +1062,6 @@ function render(){
 function evClass(e){if(e.category==='Faculty Discussion')return'Faculty';if(e.category==='Exam Review')return'ExamReview';if(e.category==='Grand Rounds')return'GrandRounds';return e.category.replace(/\s/g,'');}
 
 function renderWeek(dates){
-  // If we somehow got to week view with -1 index, reset to 0
   if(currentWeekIdx<0)currentWeekIdx=0;
   const w=WEEKS[currentWeekIdx];
   if(!w||!dates||!dates.length){document.getElementById('calView').innerHTML='<div class="empty-state"><div class="big">📭</div><p>No week data available.</p></div>';return;}
@@ -1087,6 +1086,7 @@ function renderWeek(dates){
         const durHours = Math.max(1, (endMin - startMin) / 60);
         const hp = durHours * 52 - 6;
         const ec = evClass(e);
+
         const ej=JSON.stringify(e).replace(/'/g,'&#39;').replace(/"/g,'&quot;');
         const mcalCol=mCalColor(e);
         const catCol=CAT_COLOR[e.category]||'#4a5168';
@@ -1108,7 +1108,6 @@ function renderWeek(dates){
   if(!evs.length)html=`<div class="empty-state"><div class="big">📭</div><p>No events match this filter.</p></div>`;
   document.getElementById('calView').innerHTML=html;
 }
-
 
 function renderList(){
   const w=currentWeekIdx>=0?WEEKS[currentWeekIdx]:null;
